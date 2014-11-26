@@ -19,19 +19,23 @@
   but this will allow new status codes to be counted without having any hardcoding 
 */
 ngx_atomic_t *ngx_http_status_code_counts;
+
+typedef struct {
+    ngx_int_t   startup;
+} ngx_http_status_code_counter_conf_t;
+
 static char *ngx_http_set_status_code_counter(ngx_conf_t *cf, ngx_command_t *cmd,
                                  void *conf);
 static ngx_int_t init_worker_sharedmemory(ngx_cycle_t *cycle);
 static ngx_int_t ngx_http_status_code_counter_init(ngx_conf_t *cf);
+static void * ngx_http_status_code_counter_create_conf(ngx_conf_t *cf);
 static ngx_command_t  ngx_http_status_code_counter_commands[] = {
-
     { ngx_string("show_status_code_count"),
       NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
       ngx_http_set_status_code_counter,
       0,
       0,
       NULL },
-
       ngx_null_command
 };
 
@@ -40,13 +44,10 @@ static ngx_command_t  ngx_http_status_code_counter_commands[] = {
 static ngx_http_module_t  ngx_http_status_code_counter_module_ctx = {
     NULL,                                  /* preconfiguration */
     ngx_http_status_code_counter_init,     /* postconfiguration */
-
-    NULL,                                  /* create main configuration */
+    ngx_http_status_code_counter_create_conf, /* create main configuration */
     NULL,                                  /* init main configuration */
-
     NULL,                                  /* create server configuration */
     NULL,                                  /* merge server configuration */
-
     NULL,                                  /* create location configuration */
     NULL                                   /* merge location configuration */
 };
@@ -67,13 +68,32 @@ ngx_module_t  ngx_http_status_code_counter_module = {
     NGX_MODULE_V1_PADDING
 };
 
+static void *
+ngx_http_status_code_counter_create_conf(ngx_conf_t *cf)
+{
+    ngx_http_status_code_counter_conf_t    *conf;
+    ngx_time_t  *time;
+
+    conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_status_code_counter_conf_t));
+    if (NULL == conf) {
+        return NULL;
+    }
+
+    time = ngx_timeofday();
+    conf->startup = time->sec;
+
+    return conf;
+}
+
 
 static ngx_int_t ngx_http_status_code_counter_handler(ngx_http_request_t *r)
 {
     size_t             size;
-    ngx_int_t          rc, i, j, k;
+    ngx_int_t          rc, i, j;
     ngx_buf_t         *b;
     ngx_chain_t        out;
+    ngx_time_t        *time;
+    ngx_http_status_code_counter_conf_t *cf;
         
     if (r->method != NGX_HTTP_GET && r->method != NGX_HTTP_HEAD) {
         return NGX_HTTP_NOT_ALLOWED;
@@ -83,6 +103,11 @@ static ngx_int_t ngx_http_status_code_counter_handler(ngx_http_request_t *r)
 
     if (rc != NGX_OK) {
         return rc;
+    }
+
+    cf = ngx_http_get_module_main_conf(r, ngx_http_status_code_counter_module);
+    if (NULL == cf) {
+        return NGX_ERROR;
     }
 
     ngx_str_set(&r->headers_out.content_type, "application/json");
@@ -117,21 +142,18 @@ static ngx_int_t ngx_http_status_code_counter_handler(ngx_http_request_t *r)
     out.buf = b;
     out.next = NULL;
 
-    b->last = ngx_sprintf(b->last, "{");
-    k = 0;
+    time = ngx_timeofday();
+
+    b->last = ngx_sprintf(b->last, "{\"uptime\":%uA", time->sec - cf->startup);
     for(i = 0; i < NGX_HTTP_NUM_STATUS_CODES; i++ )
     {
       if(ngx_http_status_code_counts[i] > 0)
       {
-        b->last = ngx_sprintf(b->last, "\"%uA\":%uA", i+NGX_HTTP_OK, ngx_http_status_code_counts[i]);
-        if (k+1 < j) {
-          b->last = ngx_sprintf(b->last, ",");
-        }
-        k++;
+        b->last = ngx_sprintf(b->last, ",\"%uA\":%uA", i+NGX_HTTP_OK, ngx_http_status_code_counts[i]);
       }
     }
 
-     b->last = ngx_sprintf(b->last, "}");
+    b->last = ngx_sprintf(b->last, "}");
     
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = b->last - b->pos;
