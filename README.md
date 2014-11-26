@@ -22,7 +22,7 @@ Example Config
     
 Sample Output (in JSON)
 =============
-    {"200":196333,"204":25244311,"302":614,"404":3,"499":396943}
+    {"uptime":12313,"200":196333,"204":25244311,"302":614,"404":3,"499":396943}
 
 Installation
 ============
@@ -47,12 +47,13 @@ Compatibility
 This has only been tried on 0.8.x, not sure if it works with 0.7.x
 
 *   0.8.x (last tested version is 0.8.50)
+*   1.6.x (last tested version is 1.6.2 by Rogerio Goncalves)
 
 Todo
 ====
 
-* Figure out how to write some tests for this. I don't even
-* Figure out how to store the count array better. Dynamic arrays in pure C are painful :-(
+* Figure out how to write some tests for this.
+* Add hit/miss/bypass proxy cache counters
 
 Author
 =======
@@ -94,3 +95,4 @@ Copyright & License
     LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
     NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
